@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Download, Copy, Check, Loader2, Quote } from 'lucide-react';
+import { Sparkles, Download, Copy, Check, Loader2, Quote, FileDown } from 'lucide-react';
 import { analyzeFeedback, toMarkdown, downloadFile, sampleData, guessImpactEffort } from './utils/feedback';
+import { CSVUpload } from './components/CSVUpload';
+import { mergeInputs, createLabeledCSV, downloadCSV, sampleCSV } from './utils/csv';
 
 interface Theme {
   title: string;
@@ -13,6 +15,7 @@ interface Theme {
 const STORAGE_KEY = 'chorus-feedback-input';
 
 function App() {
+  const [inputMode, setInputMode] = useState<'text' | 'csv'>('text');
   const [input, setInput] = useState(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) || '';
@@ -20,6 +23,8 @@ function App() {
       return '';
     }
   });
+  const [csvLines, setCsvLines] = useState<string[]>([]);
+  const [mergedLines, setMergedLines] = useState<string[]>([]);
   const [themes, setThemes] = useState<Theme[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState('');
@@ -48,15 +53,20 @@ function App() {
   const handleAnalyze = async () => {
     setError('');
 
-    const lines = input.split('\n').filter(line => line.trim().length > 0);
-    if (lines.length < 3) {
+    const textLines = input.split('\n').filter(line => line.trim().length > 0);
+    const { merged, stats } = mergeInputs(textLines, csvLines);
+
+    if (merged.length < 3) {
       setError('Please provide at least 3 lines of feedback to analyze.');
       return;
     }
 
+    setMergedLines(merged);
+
     setIsAnalyzing(true);
     try {
-      const result = await analyzeFeedback(input);
+      const combinedText = merged.join('\n');
+      const result = await analyzeFeedback(combinedText);
       const themesWithTags = result.map(theme => ({
         ...theme,
         ...guessImpactEffort(theme)
@@ -70,10 +80,40 @@ function App() {
   };
 
   const handleUseSample = () => {
-    setInput(sampleData);
+    if (inputMode === 'text') {
+      setInput(sampleData);
+    } else {
+      const blob = new Blob([sampleCSV], { type: 'text/csv' });
+      const file = new File([blob], 'sample.csv', { type: 'text/csv' });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      const fileInput = document.querySelector<HTMLInputElement>('#csv-upload');
+      if (fileInput) {
+        fileInput.files = dataTransfer.files;
+        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
     setThemes([]);
     setError('');
   };
+
+  const handleCsvDataExtracted = (lines: string[]) => {
+    setCsvLines(lines);
+  };
+
+  const handleExportLabeledCSV = () => {
+    const csvContent = createLabeledCSV(mergedLines, themes);
+    const today = new Date().toISOString().split('T')[0];
+    downloadCSV(`chorus_labeled_${today}.csv`, csvContent);
+  };
+
+  const getInputStats = () => {
+    const textLines = input.split('\n').filter(line => line.trim().length > 0);
+    const { stats } = mergeInputs(textLines, csvLines);
+    return stats;
+  };
+
+  const stats = getInputStats();
 
   const handleCopyTheme = async (theme: Theme, index: number) => {
     const text = `${theme.title}\n\n${theme.summary}\n\nQuotes:\n${theme.quotes.map(q => `• "${q}"`).join('\n')}`;
@@ -112,18 +152,73 @@ function App() {
         <div className="max-w-7xl mx-auto">
           <div className="grid md:grid-cols-2 gap-8">
             <div className="space-y-4">
-              <div>
-                <label htmlFor="feedback" className="block text-sm font-medium text-slate-700 mb-2">
-                  Your Feedback
-                </label>
-                <textarea
-                  id="feedback"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Paste your feedback here, one comment per line...&#10;&#10;Example:&#10;The interface is confusing&#10;I love the dark mode feature&#10;Loading times are too slow&#10;&#10;Tip: Press Cmd/Ctrl+Enter to analyze"
-                  className="w-full h-96 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-slate-900 placeholder-slate-400"
-                />
+              <div className="flex items-center gap-2 mb-2">
+                <button
+                  onClick={() => setInputMode('text')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    inputMode === 'text'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  Text
+                </button>
+                <button
+                  onClick={() => setInputMode('csv')}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    inputMode === 'csv'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  CSV
+                </button>
               </div>
+
+              {inputMode === 'text' ? (
+                <div>
+                  <label htmlFor="feedback" className="block text-sm font-medium text-slate-700 mb-2">
+                    Your Feedback
+                  </label>
+                  <textarea
+                    id="feedback"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Paste your feedback here, one comment per line...&#10;&#10;Example:&#10;The interface is confusing&#10;I love the dark mode feature&#10;Loading times are too slow&#10;&#10;Tip: Press Cmd/Ctrl+Enter to analyze"
+                    className="w-full h-96 px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-slate-900 placeholder-slate-400"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Upload CSV
+                  </label>
+                  <CSVUpload onDataExtracted={handleCsvDataExtracted} isAnalyzing={isAnalyzing} />
+                </div>
+              )}
+
+              {(stats.textCount > 0 || stats.csvCount > 0) && (
+                <div className="flex items-center gap-2 flex-wrap text-xs">
+                  {stats.textCount > 0 && (
+                    <span className="inline-flex items-center px-2 py-1 bg-slate-100 text-slate-700 rounded">
+                      Text lines: {stats.textCount}
+                    </span>
+                  )}
+                  {stats.csvCount > 0 && (
+                    <span className="inline-flex items-center px-2 py-1 bg-slate-100 text-slate-700 rounded">
+                      CSV rows: {stats.csvCount}
+                    </span>
+                  )}
+                  <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 rounded font-medium">
+                    Unique used: {stats.uniqueCount}
+                  </span>
+                  {stats.capped && (
+                    <span className="inline-flex items-center px-2 py-1 bg-amber-100 text-amber-700 rounded">
+                      Showing first 500 of {stats.totalBeforeCap} rows
+                    </span>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <button
@@ -179,7 +274,14 @@ function App() {
                       className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       <Download className="w-4 h-4" />
-                      Export
+                      Export MD
+                    </button>
+                    <button
+                      onClick={handleExportLabeledCSV}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                    >
+                      <FileDown className="w-4 h-4" />
+                      Export CSV
                     </button>
                   </div>
                 )}
@@ -204,7 +306,7 @@ function App() {
                     </li>
                     <li className="flex gap-2">
                       <span className="text-blue-600 font-bold">•</span>
-                      <span>Easy export to Markdown format</span>
+                      <span>Easy export to Markdown or labeled CSV</span>
                     </li>
                   </ul>
                 </div>
@@ -260,7 +362,7 @@ function App() {
 
       <footer className="bg-white border-t border-slate-200 px-6 py-4 mt-8">
         <div className="max-w-7xl mx-auto text-center text-sm text-slate-600">
-          <p>Chorus turns noisy feedback into clear themes. MIT License.</p>
+          <p>Chorus turns noisy feedback into clear themes. Now supports CSV upload and labeled CSV export. MIT License.</p>
         </div>
       </footer>
     </div>
