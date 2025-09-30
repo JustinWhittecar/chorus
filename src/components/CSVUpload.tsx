@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Upload, FileText, Loader2, X } from 'lucide-react';
 import { parseCSV, chooseTextColumn, extractTextFromCSV, ParsedCSV, ParseResult } from '../utils/csv';
+import { getSavedColumnForHeaders, saveColumnPref, setLastSelectedColumnName, headerSetHash } from '../utils/storage';
 
 interface CSVUploadProps {
   onDataExtracted: (lines: string[]) => void;
@@ -14,8 +15,11 @@ export function CSVUpload({ onDataExtracted, isAnalyzing }: CSVUploadProps) {
   const [parsed, setParsed] = useState<ParsedCSV | null>(null);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
   const [selectedColumn, setSelectedColumn] = useState(0);
+  const [autoSelectedColumn, setAutoSelectedColumn] = useState<string | null>(null);
+  const [rememberChoice, setRememberChoice] = useState(true);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const columnSelectRef = useRef<HTMLSelectElement>(null);
 
   const handleFile = useCallback(async (file: File) => {
     if (file.size > 5 * 1024 * 1024) {
@@ -36,16 +40,36 @@ export function CSVUpload({ onDataExtracted, isAnalyzing }: CSVUploadProps) {
       const parsedData = await parseCSV(file);
       setParsed(parsedData);
 
-      const suggestedColumn = chooseTextColumn(parsedData.headers, parsedData.rows);
-      setSelectedColumn(suggestedColumn);
+      let columnToSelect = 0;
+      let autoSelected: string | null = null;
 
-      const result = extractTextFromCSV(parsedData, suggestedColumn);
+      if (parsedData.headers && parsedData.headers.length > 0) {
+        const savedColumn = getSavedColumnForHeaders(parsedData.headers);
+
+        if (savedColumn) {
+          const savedIndex = parsedData.headers.indexOf(savedColumn);
+          if (savedIndex !== -1) {
+            columnToSelect = savedIndex;
+            autoSelected = savedColumn;
+          }
+        } else {
+          columnToSelect = chooseTextColumn(parsedData.headers, parsedData.rows);
+        }
+      } else {
+        columnToSelect = chooseTextColumn(parsedData.headers, parsedData.rows);
+      }
+
+      setSelectedColumn(columnToSelect);
+      setAutoSelectedColumn(autoSelected);
+
+      const result = extractTextFromCSV(parsedData, columnToSelect);
       setParseResult(result);
       onDataExtracted(result.textLines);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to parse CSV');
       setParsed(null);
       setParseResult(null);
+      setAutoSelectedColumn(null);
     } finally {
       setIsProcessing(false);
     }
@@ -89,12 +113,24 @@ export function CSVUpload({ onDataExtracted, isAnalyzing }: CSVUploadProps) {
   const handleColumnChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newColumn = parseInt(e.target.value, 10);
     setSelectedColumn(newColumn);
+    setAutoSelectedColumn(null);
 
     if (parsed) {
       const result = extractTextFromCSV(parsed, newColumn);
       setParseResult(result);
       onDataExtracted(result.textLines);
+
+      if (rememberChoice && parsed.headers && parsed.headers[newColumn]) {
+        const columnName = parsed.headers[newColumn];
+        const hash = headerSetHash(parsed.headers);
+        saveColumnPref(hash, columnName);
+        setLastSelectedColumnName(columnName);
+      }
     }
+  };
+
+  const focusColumnSelect = () => {
+    columnSelectRef.current?.focus();
   };
 
   const handleClear = () => {
@@ -102,6 +138,7 @@ export function CSVUpload({ onDataExtracted, isAnalyzing }: CSVUploadProps) {
     setParsed(null);
     setParseResult(null);
     setSelectedColumn(0);
+    setAutoSelectedColumn(null);
     setError('');
     onDataExtracted([]);
     if (fileInputRef.current) {
@@ -159,6 +196,10 @@ export function CSVUpload({ onDataExtracted, isAnalyzing }: CSVUploadProps) {
           <p className="text-xs text-slate-500 mt-4">
             CSV files up to 5MB. Accepts comma or semicolon delimiters.
           </p>
+
+          <p className="text-xs text-slate-500 mt-2">
+            Tip: Chorus remembers your column choice for this header set on this browser.
+          </p>
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-4">
@@ -192,11 +233,12 @@ export function CSVUpload({ onDataExtracted, isAnalyzing }: CSVUploadProps) {
           )}
 
           {parsed && parsed.headers && (
-            <div>
-              <label htmlFor="column-select" className="block text-xs font-medium text-slate-700 mb-1">
+            <div className="space-y-2">
+              <label htmlFor="column-select" className="block text-xs font-medium text-slate-700">
                 Feedback Column
               </label>
               <select
+                ref={columnSelectRef}
                 id="column-select"
                 value={selectedColumn}
                 onChange={handleColumnChange}
@@ -209,6 +251,28 @@ export function CSVUpload({ onDataExtracted, isAnalyzing }: CSVUploadProps) {
                   </option>
                 ))}
               </select>
+
+              {autoSelectedColumn && (
+                <div className="text-xs text-blue-700 bg-blue-50 px-3 py-2 rounded border border-blue-100">
+                  Auto-selected column '{autoSelectedColumn}' from previous choice.{' '}
+                  <button
+                    onClick={focusColumnSelect}
+                    className="underline hover:text-blue-900 font-medium"
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
+
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={rememberChoice}
+                  onChange={(e) => setRememberChoice(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                />
+                <span>Remember my choice</span>
+              </label>
             </div>
           )}
 

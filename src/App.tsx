@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Download, Copy, Check, Loader2, Quote, FileDown } from 'lucide-react';
+import { Sparkles, Download, Copy, Check, Loader2, FileDown, RotateCcw } from 'lucide-react';
 import { analyzeFeedback, toMarkdown, downloadFile, sampleData, guessImpactEffort } from './utils/feedback';
 import { CSVUpload } from './components/CSVUpload';
+import { ThemeCard, getEffectiveTitle } from './components/ThemeCard';
 import { mergeInputs, createLabeledCSV, downloadCSV, sampleCSV } from './utils/csv';
 
 interface Theme {
   title: string;
+  customTitle?: string;
   summary: string;
   quotes: string[];
   impact?: 'Low' | 'Med' | 'High';
@@ -102,7 +104,11 @@ function App() {
   };
 
   const handleExportLabeledCSV = () => {
-    const csvContent = createLabeledCSV(mergedLines, themes);
+    const themesWithEffectiveTitles = themes.map(theme => ({
+      ...theme,
+      title: getEffectiveTitle(theme)
+    }));
+    const csvContent = createLabeledCSV(mergedLines, themesWithEffectiveTitles);
     const today = new Date().toISOString().split('T')[0];
     downloadCSV(`chorus_labeled_${today}.csv`, csvContent);
   };
@@ -116,19 +122,38 @@ function App() {
   const stats = getInputStats();
 
   const handleCopyTheme = async (theme: Theme, index: number) => {
-    const text = `${theme.title}\n\n${theme.summary}\n\nQuotes:\n${theme.quotes.map(q => `• "${q}"`).join('\n')}`;
+    const effectiveTitle = getEffectiveTitle(theme);
+    const text = `${effectiveTitle}\n\n${theme.summary}\n\nQuotes:\n${theme.quotes.map(q => `• "${q}"`).join('\n')}`;
     await navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  const handleRenameTheme = (index: number, newTitle: string) => {
+    setThemes(prev => prev.map((theme, i) =>
+      i === index ? { ...theme, customTitle: newTitle } : theme
+    ));
+  };
+
+  const handleResetTitles = () => {
+    setThemes(prev => prev.map(theme => ({ ...theme, customTitle: undefined })));
+  };
+
   const handleExportMarkdown = () => {
-    const markdown = toMarkdown(themes);
+    const themesWithEffectiveTitles = themes.map(theme => ({
+      ...theme,
+      title: getEffectiveTitle(theme)
+    }));
+    const markdown = toMarkdown(themesWithEffectiveTitles);
     downloadFile('chorus-themes.md', markdown);
   };
 
   const handleCopyAll = async () => {
-    const markdown = toMarkdown(themes);
+    const themesWithEffectiveTitles = themes.map(theme => ({
+      ...theme,
+      title: getEffectiveTitle(theme)
+    }));
+    const markdown = toMarkdown(themesWithEffectiveTitles);
     await navigator.clipboard.writeText(markdown);
     setCopyAllSuccess(true);
     setTimeout(() => setCopyAllSuccess(false), 2000);
@@ -257,7 +282,15 @@ function App() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-slate-900">Themes</h2>
                 {themes.length > 0 && (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={handleResetTitles}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                      title="Reset all theme titles to AI-generated versions"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Reset Titles
+                    </button>
                     <button
                       onClick={handleCopyAll}
                       className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
@@ -313,45 +346,14 @@ function App() {
               ) : (
                 <div className="space-y-4">
                   {themes.map((theme, index) => (
-                    <div key={index} className="bg-white border border-slate-200 rounded-lg p-6">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h3 className="text-base font-semibold text-slate-900 mb-2">{theme.title}</h3>
-                          <div className="flex gap-2">
-                            {theme.impact && (
-                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded">
-                                Impact: {theme.impact}
-                              </span>
-                            )}
-                            {theme.effort && (
-                              <span className="inline-flex items-center px-2 py-1 text-xs font-medium bg-slate-50 text-slate-700 rounded">
-                                Effort: {theme.effort}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleCopyTheme(theme, index)}
-                          className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors flex-shrink-0"
-                          title="Copy theme"
-                        >
-                          {copiedIndex === index ? (
-                            <Check className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                      <p className="text-sm text-slate-600 mb-4">{theme.summary}</p>
-                      <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50">
-                        {theme.quotes.map((quote, qIndex) => (
-                          <div key={qIndex} className="flex gap-3">
-                            <Quote className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                            <p className="text-sm text-slate-700 italic">{quote}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <ThemeCard
+                      key={index}
+                      theme={theme}
+                      index={index}
+                      isCopied={copiedIndex === index}
+                      onCopy={() => handleCopyTheme(theme, index)}
+                      onRename={(newTitle) => handleRenameTheme(index, newTitle)}
+                    />
                   ))}
                 </div>
               )}
@@ -362,7 +364,7 @@ function App() {
 
       <footer className="bg-white border-t border-slate-200 px-6 py-4 mt-8">
         <div className="max-w-7xl mx-auto text-center text-sm text-slate-600">
-          <p>Chorus turns noisy feedback into clear themes. Now supports CSV upload and labeled CSV export. MIT License.</p>
+          <p>Chorus turns noisy feedback into clear themes. Now supports CSV uploads, labeled exports, and inline theme renaming with remembered CSV column mapping. MIT License.</p>
         </div>
       </footer>
     </div>
