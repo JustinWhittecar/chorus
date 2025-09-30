@@ -28,7 +28,13 @@ Paste in the feedback → see the chorus emerge.
 ## How It Works  
 1. **Input**: Paste raw user feedback (multiple lines of text).  
 2. **Process**: AI clusters feedback into themes.  
-3. **Output**: Clean cards with a theme title, summary, and supporting quotes.  
+3. **Output**: Clean cards with a theme title, summary, and supporting quotes.
+
+**CSV Uploads**
+- Upload a .csv with or without headers.
+- Choose the column that contains feedback text.
+- Chorus merges CSV rows with any pasted text, de-duplicates, and analyzes up to 500 lines.
+- After analysis, download a labeled CSV: `original_text, theme_title`.
 
 ---
 
