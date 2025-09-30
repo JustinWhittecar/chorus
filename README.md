@@ -53,7 +53,7 @@ Paste in the feedback → see the chorus emerge.
 ---
 
 ## Try It Yourself  
-https://justinwhittecar-chor-1wa6.bolt.host
+https://chorusfeedback.com
 
 ---
 
