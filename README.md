@@ -21,8 +21,13 @@ Paste in the feedback → see the chorus emerge.
 ---
 
 ## Demo  
-🔜 *(screenshot / GIF of the app once MVP is live)*  
-
+<div>
+    <a href="https://www.loom.com/share/fdee6705ec894052a76d5a0db83eba40">
+    </a>
+    <a href="https://www.loom.com/share/fdee6705ec894052a76d5a0db83eba40">
+      <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/fdee6705ec894052a76d5a0db83eba40-03c7cbce5b04bb25-full-play.gif">
+    </a>
+  </div>
 ---
 
 ## How It Works  
@@ -36,17 +41,19 @@ Paste in the feedback → see the chorus emerge.
 - Chorus merges CSV rows with any pasted text, de-duplicates, and analyzes up to 500 lines.
 - After analysis, download a labeled CSV: `original_text, theme_title`.
 
+**Inline renaming + smart CSV remember**
+- Click a theme title to rename it (affects all exports).
+- Chorus remembers your chosen CSV column per header set in your browser (change anytime).
+
+**Built-in feedback**
+- Floating Feedback button opens a modal to share what you were trying to do, what happened, and an optional rating.
+- Saves locally; you can copy to clipboard, open a prefilled GitHub Issue, or email it.
+- Optionally includes anonymized context (counts + theme titles) to help debug.
+
 ---
 
 ## Try It Yourself  
 https://justinwhittecar-chor-1wa6.bolt.host
-<div>
-    <a href="https://www.loom.com/share/fdee6705ec894052a76d5a0db83eba40">
-    </a>
-    <a href="https://www.loom.com/share/fdee6705ec894052a76d5a0db83eba40">
-      <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/fdee6705ec894052a76d5a0db83eba40-03c7cbce5b04bb25-full-play.gif">
-    </a>
-  </div>
 
 ---
 
