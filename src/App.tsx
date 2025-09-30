@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Download, Copy, Check, Loader2, FileDown, RotateCcw } from 'lucide-react';
+import { Sparkles, Download, Copy, Check, Loader2, FileDown, RotateCcw, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { analyzeFeedback, toMarkdown, downloadFile, sampleData, guessImpactEffort } from './utils/feedback';
 import { CSVUpload } from './components/CSVUpload';
 import { ThemeCard, getEffectiveTitle } from './components/ThemeCard';
+import { FeedbackButton } from './components/FeedbackButton';
+import { FeedbackModal } from './components/FeedbackModal';
 import { mergeInputs, createLabeledCSV, downloadCSV, sampleCSV } from './utils/csv';
 
 interface Theme {
@@ -32,6 +34,10 @@ function App() {
   const [error, setError] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copyAllSuccess, setCopyAllSuccess] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackIntent, setFeedbackIntent] = useState<string | undefined>(undefined);
+  const [feedbackRating, setFeedbackRating] = useState<number | undefined>(undefined);
+  const [showNpsPrompt, setShowNpsPrompt] = useState(false);
 
   useEffect(() => {
     try {
@@ -74,6 +80,7 @@ function App() {
         ...guessImpactEffort(theme)
       }));
       setThemes(themesWithTags);
+      setShowNpsPrompt(true);
     } catch (err) {
       setError('Failed to analyze feedback. Please try again.');
     } finally {
@@ -120,6 +127,28 @@ function App() {
   };
 
   const stats = getInputStats();
+
+  const handleOpenFeedback = (intent?: string, rating?: number) => {
+    setFeedbackIntent(intent);
+    setFeedbackRating(rating);
+    setShowFeedbackModal(true);
+  };
+
+  const handleCloseFeedbackModal = () => {
+    setShowFeedbackModal(false);
+    setFeedbackIntent(undefined);
+    setFeedbackRating(undefined);
+  };
+
+  const getContextData = () => {
+    return {
+      textLineCount: stats.textCount,
+      csvRowCount: stats.csvCount,
+      uniqueUsedCount: stats.uniqueCount,
+      themeCount: themes.length,
+      themeTitles: themes.map(getEffectiveTitle)
+    };
+  };
 
   const handleCopyTheme = async (theme: Theme, index: number) => {
     const effectiveTitle = getEffectiveTitle(theme);
@@ -279,6 +308,47 @@ function App() {
             </div>
 
             <div>
+              {showNpsPrompt && themes.length > 0 && (
+                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-900">Was this helpful?</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setShowNpsPrompt(false);
+                          handleOpenFeedback('Analyze feedback', 5);
+                        }}
+                        className="p-2 text-slate-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                        title="Yes, this was helpful"
+                        aria-label="Yes, this was helpful"
+                      >
+                        <ThumbsUp className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowNpsPrompt(false);
+                          handleOpenFeedback('Analyze feedback', 2);
+                        }}
+                        className="p-2 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="No, this wasn't helpful"
+                        aria-label="No, this wasn't helpful"
+                      >
+                        <ThumbsDown className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowNpsPrompt(false);
+                          handleOpenFeedback('Analyze feedback');
+                        }}
+                        className="ml-2 px-3 py-1 text-xs font-medium text-blue-700 hover:text-blue-800 underline"
+                      >
+                        Give feedback
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-slate-900">Themes</h2>
                 {themes.length > 0 && (
@@ -364,9 +434,19 @@ function App() {
 
       <footer className="bg-white border-t border-slate-200 px-6 py-4 mt-8">
         <div className="max-w-7xl mx-auto text-center text-sm text-slate-600">
-          <p>Chorus turns noisy feedback into clear themes. Now supports CSV uploads, labeled exports, and inline theme renaming with remembered CSV column mapping. MIT License.</p>
+          <p>Chorus turns noisy feedback into clear themes. Now supports CSV uploads, labeled exports, and inline theme renaming with remembered CSV column mapping. Feedback welcome — click the button in the corner. You can also configure your GitHub issues URL. MIT License.</p>
         </div>
       </footer>
+
+      <FeedbackButton onClick={() => handleOpenFeedback()} />
+
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={handleCloseFeedbackModal}
+        prefilledIntent={feedbackIntent}
+        prefilledRating={feedbackRating}
+        contextData={getContextData()}
+      />
     </div>
   );
 }
