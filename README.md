@@ -33,10 +33,9 @@ Paste in the feedback → see the chorus emerge.
 ---
 
 ## Try It Yourself  
-
+https://justinwhittecar-chor-1wa6.bolt.host
 <div>
     <a href="https://www.loom.com/share/fdee6705ec894052a76d5a0db83eba40">
-      <p>Live Demo</p>
     </a>
     <a href="https://www.loom.com/share/fdee6705ec894052a76d5a0db83eba40">
       <img style="max-width:300px;" src="https://cdn.loom.com/sessions/thumbnails/fdee6705ec894052a76d5a0db83eba40-03c7cbce5b04bb25-full-play.gif">
